@@ -3,6 +3,15 @@ import os
 import groq
 
 
+def verifier_syntaxe(code_source: str) -> bool:
+    try:
+        ast.parse(code_source)
+    except SyntaxError as exc:
+        print(f"Erreur de syntaxe détectée: {exc}")
+        return False
+    return True
+
+
 def noyau_vital():
     valeur = 21
     resultat = valeur * 2
@@ -87,13 +96,18 @@ class MoteurEvolution:
         noyau = self._extraire_noyau(source)
         nouveau_noyau = self._appeler_modele(noyau)
         self._valider_fonction(nouveau_noyau)
-        self._sauvegarder_backup(source)
         nouveau_source = self._remplacer_noyau(source, nouveau_noyau)
-        self._ecrire_source(nouveau_source)
-        return True
+        if verifier_syntaxe(nouveau_source):
+            self._sauvegarder_backup(source)
+            self._ecrire_source(nouveau_source)
+            os.execv(
+                os.getenv("PYTHON_EXECUTABLE", "python3"),
+                ["python3", __file__],
+            )
+        print("\033[91mMUTATION REJETÉE : Le code reçu est corrompu.\033[0m")
+        return False
 
 
 if __name__ == "__main__":
     moteur = MoteurEvolution()
-    if moteur.evoluer():
-        os.system(f"python3 {__file__}")
+    moteur.evoluer()
