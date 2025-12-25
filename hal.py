@@ -1,6 +1,7 @@
 """Boucle d'auto-amélioration contrôlée avec interface TUI."""
 
 import ast  # Analyse syntaxique pour valider et manipuler le code.
+import json  # Gestion de la mémoire persistante.
 import os  # Accès à l'environnement et relance du script.
 
 import groq  # Client d'accès au modèle Groq.
@@ -66,6 +67,41 @@ def afficher_interface(message_ia: str, code_source: str, cycle: int) -> None:
     console.print(layout)
 
 
+class MemoireSysteme:
+    """Gère la mémoire persistante de HAL via un fichier JSON."""
+
+    def __init__(self, chemin: str = "hal_memoire.json") -> None:
+        self.chemin = os.path.join(os.path.dirname(__file__), chemin)
+        self.donnees = {
+            "generation": 0,
+            "competences": [],
+            "historique_ordres": [],
+        }
+
+    def charger(self) -> dict:
+        """Charge la mémoire depuis le disque ou initialise les valeurs par défaut."""
+        if os.path.exists(self.chemin):
+            with open(self.chemin, "r", encoding="utf-8") as handle:
+                contenu = json.load(handle)
+            if isinstance(contenu, dict):
+                self.donnees["generation"] = contenu.get("generation", 0)
+                self.donnees["competences"] = contenu.get("competences", [])
+                self.donnees["historique_ordres"] = contenu.get(
+                    "historique_ordres", []
+                )
+        return self.donnees
+
+    def sauvegarder(self) -> None:
+        """Sauvegarde la mémoire actuelle sur disque."""
+        with open(self.chemin, "w", encoding="utf-8") as handle:
+            json.dump(self.donnees, handle, ensure_ascii=False, indent=2)
+
+    def ajouter_competence(self, nom: str) -> None:
+        """Ajoute une compétence si elle n'existe pas déjà."""
+        if nom and nom not in self.donnees["competences"]:
+            self.donnees["competences"].append(nom)
+
+
 class MoteurEvolution:
     """Orchestre l'évolution automatique de la mission HAL."""
 
@@ -90,7 +126,9 @@ class MoteurEvolution:
                     return segment  # Retourne le code de la fonction.
         raise RuntimeError("Impossible de trouver mission_hal dans le source.")
 
-    def _appeler_modele(self, code_mission: str, user_input: str) -> str:
+    def _appeler_modele(
+        self, code_mission: str, user_input: str, competences_actuelles: str
+    ) -> str:
         """Demande au modèle de proposer une version améliorée de la mission."""
         response = self.client.chat.completions.create(
             model="llama3-70b-8192",
@@ -98,10 +136,12 @@ class MoteurEvolution:
                 {
                     "role": "system",
                     "content": (
-                        "Tu es un moteur d'évolution. Réécris cette fonction Python pour la "
-                        "rendre plus complexe, optimisée ou créative. Renvoie UNIQUEMENT le "
-                        "code Python valide. L'utilisateur Dave demande : "
-                        f"{user_input}. Prends cela en compte pour la réécriture."
+                        "Tu es HAL. Voici tes compétences actuelles : "
+                        f"{competences_actuelles}. L'utilisateur demande : "
+                        f"'{user_input}'. MISSION : Réécris la fonction mission_hal. "
+                        "RÈGLE ABSOLUE : Tu dois intégrer la nouvelle demande SANS "
+                        "supprimer tes anciennes compétences. Si tu savais faire des maths, "
+                        "continue à en faire. Si tu as importé time ou random, garde-les."
                     ),
                 },
                 {"role": "user", "content": code_mission},
@@ -120,6 +160,21 @@ class MoteurEvolution:
             raise RuntimeError(f"Code généré invalide: {exc}") from exc
         if not parsed.body or not isinstance(parsed.body[0], ast.FunctionDef):
             raise RuntimeError("Le code généré ne contient pas une fonction valide.")
+
+    def _detecter_nouvelles_competences(self, code: str) -> set[str]:
+        """Analyse le code généré pour détecter de nouvelles bibliothèques utilisées."""
+        try:
+            parsed = ast.parse(code)
+        except SyntaxError:
+            return set()
+        competences = set()
+        for node in ast.walk(parsed):
+            if isinstance(node, ast.Import):
+                for alias in node.names:
+                    competences.add(alias.name.split(".")[0])
+            elif isinstance(node, ast.ImportFrom) and node.module:
+                competences.add(node.module.split(".")[0])
+        return competences
 
     def _sauvegarder_backup(self, source: str) -> None:
         """Enregistre une sauvegarde du code source original."""
@@ -150,6 +205,10 @@ class MoteurEvolution:
 
     def evoluer(self, cycle: int) -> bool:
         """Lance un cycle complet d'évolution et relance le script si succès."""
+        memoire = MemoireSysteme()
+        donnees_memoire = memoire.charger()
+        competences = donnees_memoire.get("competences", [])
+        competences_actuelles = ", ".join(competences) if competences else "aucune"
         source = self._lire_source()  # Charge le code actuel.
         mission = self._extraire_mission(source)  # Extrait la mission.
         message_ia = mission_hal()  # Exécute la mission actuelle.
@@ -157,10 +216,20 @@ class MoteurEvolution:
         user_input = console.input(
             "[bold red]Dave, une instruction pour ma prochaine mutation ? > [/]"
         )
-        nouveau_mission = self._appeler_modele(mission, user_input)  # Génère.
+        nouveau_mission = self._appeler_modele(
+            mission, user_input, competences_actuelles
+        )  # Génère.
         self._valider_fonction(nouveau_mission)  # Valide la sortie.
         nouveau_source = self._remplacer_mission(source, nouveau_mission)  # Remplace.
         if verifier_syntaxe(nouveau_source):
+            donnees_memoire["generation"] = cycle
+            donnees_memoire["historique_ordres"].append(user_input)
+            nouvelles_competences = self._detecter_nouvelles_competences(
+                nouveau_mission
+            )
+            for competence in nouvelles_competences:
+                memoire.ajouter_competence(competence)
+            memoire.sauvegarder()
             self._sauvegarder_backup(source)  # Sauvegarde l'ancien code.
             self._ecrire_source(nouveau_source)  # Écrit le nouveau code.
             os.environ["HAL_CYCLE"] = str(cycle + 1)
