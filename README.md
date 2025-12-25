@@ -1,20 +1,21 @@
 # propan
 
-Prototype minimal d'auto-amélioration d'une fonction Python via un modèle Groq.
+## Présentation
+propan est un projet expérimental centré sur l’IA. L’objectif est de proposer une base minimale et flexible pour explorer des idées, prototyper des scripts et tester des concepts autour de l’intelligence artificielle.
 
-## Prérequis
+## Ce que contient le dépôt
+- **`ouroboros.py`** : script principal (point de départ pour les expérimentations et essais).
+- **`README.md`** : documentation et informations générales du projet.
 
-- Python 3.10+.
-- Dépendance `groq` installée (`pip install groq`).
-- Variable d'environnement `GROQ_API_KEY` définie.
+## À quoi sert ce projet ?
+- **Exploration** : tester rapidement des idées ou des algorithmes liés à l’IA.
+- **Prototype** : servir de socle simple pour ajouter des modules ou des fonctionnalités.
+- **Documentation** : centraliser les explications et l’intention du projet.
 
-## Utilisation
+## Démarrage rapide
+1. Ouvrir le dépôt.
+2. Examiner le script `ouroboros.py`.
+3. Lancer le script selon votre environnement Python.
 
-```bash
-export GROQ_API_KEY="votre_cle_api"
-python3 ouroboros.py
-```
-
-Le script lit son propre fichier, extrait la fonction `noyau_vital`, demande au modèle
-une version améliorée, valide le résultat, écrit une sauvegarde (`ouroboros.py.bak`),
-remplace le code et relance automatiquement le script.
+## État du projet
+Le projet est volontairement minimaliste et sert de point de départ. Il peut évoluer selon les besoins des expérimentations.
