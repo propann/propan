@@ -1,0 +1,37 @@
+version: "3.8"
+
+services:
+  ft_engine:
+    image: freqtradeorg/freqtrade:stable
+    container_name: ft_engine
+    volumes:
+      - ./user_data:/freqtrade/user_data
+    command: >
+      trade --config /freqtrade/user_data/config.json --enable-api
+    ports:
+      - "8080:8080"
+
+  ft_ui:
+    image: freqtradeorg/freqtrade-ui:stable
+    container_name: ft_ui
+    depends_on:
+      - ft_engine
+    environment:
+      - FREQTRADE_API_URL=http://ft_engine:8080
+    ports:
+      - "3000:3000"
+
+  hal_9000:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: hal_9000
+    depends_on:
+      - ft_engine
+    volumes:
+      - ./:/app
+    environment:
+      - GROQ_API_KEY=${GROQ_API_KEY}
+      - HAL_VOICE=en-US-GuyNeural
+    ports:
+      - "9000:9000"
