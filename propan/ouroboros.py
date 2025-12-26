@@ -104,7 +104,7 @@ class MoteurEvolution:
                 return False
             resultat = fonction()
             logger.info("Résultat du test sandbox: %s", resultat)
-        except Exception:
+        except Exception:  # noqa: BLE001
             logger.error("Erreur critique lors du test sandbox.")
             traceback.print_exc()
             return False

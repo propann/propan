@@ -4,9 +4,10 @@ from __future__ import annotations
 
 import importlib
 import logging
-from typing import Iterable
+from collections.abc import Iterable
 
 import typer
+
 from .logging_utils import configure_logging
 from .settings import get_settings
 
@@ -107,6 +108,20 @@ def doctor() -> None:
         issues.append(f"Dépendances manquantes: {', '.join(missing)}")
     else:
         typer.echo("✔ Dépendances Python OK")
+
+    if settings.groq_api_key and "groq" not in missing:
+        import groq
+
+        try:
+            client = groq.Groq(api_key=settings.groq_api_key)
+            client.models.list()
+            typer.echo("✔ Groq API key validée")
+        except Exception as exc:  # noqa: BLE001
+            message = str(exc)
+            if "401" in message:
+                issues.append("Groq API key rejetée (401 Unauthorized).")
+            else:
+                issues.append(f"Diagnostic Groq KO: {exc}")
 
     if settings.ft_engine_profit_url and "requests" not in missing:
         import requests

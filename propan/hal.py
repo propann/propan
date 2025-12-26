@@ -188,7 +188,7 @@ class MoteurEvolution:
                 return False
             resultat = fonction()
             logger.info("Résultat du test sandbox: %s", resultat)
-        except Exception:
+        except Exception:  # noqa: BLE001
             console.print(
                 "[bold red]Erreur critique lors du test sandbox (voir logs).[/]"
             )
