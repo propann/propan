@@ -5,6 +5,8 @@ from __future__ import annotations
 import ast
 import logging
 import os
+import sys
+import traceback
 from pathlib import Path
 
 import groq
@@ -86,6 +88,28 @@ class MoteurEvolution:
         if not parsed.body or not isinstance(parsed.body[0], ast.FunctionDef):
             raise RuntimeError("Le code généré ne contient pas une fonction valide.")
 
+    def _tester_sandbox(self, code: str) -> bool:
+        """Teste le code généré en exécutant la fonction dans un scope isolé."""
+        logger.info("Test de la mutation en sandbox.")
+        try:
+            ast.parse(code)
+            sandbox_globals = globals().copy()
+            local_scope: dict[str, object] = {}
+            exec(code, sandbox_globals, local_scope)
+            fonction = local_scope.get("noyau_vital") or sandbox_globals.get(
+                "noyau_vital"
+            )
+            if not callable(fonction):
+                logger.error("La fonction noyau_vital est absente ou invalide.")
+                return False
+            resultat = fonction()
+            logger.info("Résultat du test sandbox: %s", resultat)
+        except Exception:
+            logger.error("Erreur critique lors du test sandbox.")
+            traceback.print_exc()
+            return False
+        return True
+
     def _sauvegarder_backup(self, source: str) -> None:
         """Enregistre une sauvegarde du code source original."""
         Path(f"{__file__}.bak").write_text(source, encoding="utf-8")
@@ -117,15 +141,15 @@ class MoteurEvolution:
         noyau = self._extraire_noyau(source)
         nouveau_noyau = self._appeler_modele(noyau)
         self._valider_fonction(nouveau_noyau)
-        nouveau_source = self._remplacer_noyau(source, nouveau_noyau)
+        if self._tester_sandbox(nouveau_noyau):
+            nouveau_source = self._remplacer_noyau(source, nouveau_noyau)
+        else:
+            logger.error("MUTATION REJETÉE : Erreur détectée en sandbox.")
+            return False
         if verifier_syntaxe(nouveau_source):
             self._sauvegarder_backup(source)
             self._ecrire_source(nouveau_source)
-            settings = get_settings()
-            os.execv(
-                settings.python_executable,
-                [settings.python_executable, __file__],
-            )
+            os.execv(sys.executable, [sys.executable, __file__])
         logger.error("MUTATION REJETÉE : Le code reçu est corrompu.")
         return False
 
