@@ -7,7 +7,6 @@ import logging
 import os
 import time
 from pathlib import Path
-from typing import Optional
 
 import groq
 from rich.console import Console
@@ -179,7 +178,7 @@ def _refresh_once(
 def run_dashboard() -> None:
     """Boucle principale d'affichage et mutation de HAL."""
     settings = get_settings()
-    client: Optional[groq.Groq] = None
+    client: groq.Groq | None = None
     if settings.groq_api_key:
         client = groq.Groq(api_key=settings.groq_api_key)
 

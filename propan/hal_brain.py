@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ast
 import asyncio
 import json
 import logging
@@ -52,9 +53,7 @@ def status():
 def speech():
     settings = get_settings()
     if settings.hal_speech_file.exists():
-        return send_from_directory(
-            settings.hal_speech_file.parent, settings.hal_speech_file.name
-        )
+        return send_from_directory(settings.hal_speech_file.parent, settings.hal_speech_file.name)
     return ("speech.mp3 not generated yet", 404)
 
 
@@ -127,11 +126,61 @@ def generate_speech(text: str) -> None:
         loop.close()
 
 
+def _extract_routes(tree: ast.AST) -> dict[str, str]:
+    routes: dict[str, str] = {}
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.FunctionDef):
+            continue
+        for decorator in node.decorator_list:
+            if not isinstance(decorator, ast.Call):
+                continue
+            if not isinstance(decorator.func, ast.Attribute):
+                continue
+            if decorator.func.attr != "route":
+                continue
+            if not isinstance(decorator.func.value, ast.Name):
+                continue
+            if decorator.func.value.id != "app":
+                continue
+            if not decorator.args:
+                continue
+            route_arg = decorator.args[0]
+            if isinstance(route_arg, ast.Constant) and isinstance(route_arg.value, str):
+                routes[route_arg.value] = node.name
+    return routes
+
+
+def _validate_self_improvement_code(new_code: str) -> tuple[bool, str]:
+    try:
+        tree = ast.parse(new_code)
+    except SyntaxError as exc:
+        return False, f"syntax invalid: {exc}"
+
+    functions = {node.name for node in ast.walk(tree) if isinstance(node, ast.FunctionDef)}
+    required_functions = {"index", "status", "speech", "main_loop", "main"}
+    missing_functions = required_functions - functions
+    if missing_functions:
+        return False, f"missing functions: {', '.join(sorted(missing_functions))}"
+
+    routes = _extract_routes(tree)
+    required_routes = {"/", "/status", "/speech.mp3"}
+    missing_routes = required_routes - set(routes)
+    if missing_routes:
+        return False, f"missing routes: {', '.join(sorted(missing_routes))}"
+
+    return True, "ok"
+
+
 def attempt_self_improvement(cycle_index: int) -> bool:
     settings = get_settings()
+    if not settings.hal_self_improve:
+        logger.info("Self-improvement skipped: HAL_SELF_IMPROVE disabled.")
+        return False
     if not settings.groq_api_key:
+        logger.info("Self-improvement skipped: GROQ_API_KEY missing.")
         return False
     if cycle_index % settings.hal_self_improve_every != 0:
+        logger.info("Self-improvement skipped: cycle %s not scheduled.", cycle_index)
         return False
 
     current_code = Path(__file__).read_text(encoding="utf-8")
@@ -154,9 +203,21 @@ def attempt_self_improvement(cycle_index: int) -> bool:
         logger.error("Self-improvement failed: %s", exc)
         return False
 
-    if not new_code or "HAL STATUS" not in new_code:
-        logger.warning("Self-improvement rejected: output invalid.")
+    if not new_code:
+        logger.warning("Self-improvement rejected: empty output.")
         return False
+    if "HAL STATUS" not in new_code:
+        logger.warning("Self-improvement rejected: missing HAL STATUS page.")
+        return False
+
+    is_valid, reason = _validate_self_improvement_code(new_code)
+    if not is_valid:
+        logger.warning("Self-improvement rejected: %s", reason)
+        return False
+
+    backup_path = Path(__file__).with_suffix(".py.bak")
+    backup_path.write_text(current_code, encoding="utf-8")
+    logger.info("Backup written: %s", backup_path)
 
     Path(__file__).write_text(new_code, encoding="utf-8")
     logger.info("HAL upgraded. Restarting...")

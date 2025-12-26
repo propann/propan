@@ -266,7 +266,6 @@ def main_loop():
 
         time.sleep(30)
 
-
 if __name__ == "__main__":
     # Lancement du serveur Web dans un thread séparé
     web_thread = threading.Thread(target=run_web, daemon=True)

@@ -24,6 +24,7 @@ class Settings(BaseSettings):
     )
     hal_voice: str = Field(default="en-US-GuyNeural", validation_alias="HAL_VOICE")
     hal_speech_file: Path = Field(default=Path("speech.mp3"), validation_alias="HAL_SPEECH_FILE")
+    hal_self_improve: bool = Field(default=False, validation_alias="HAL_SELF_IMPROVE")
     hal_self_improve_every: int = Field(default=5, validation_alias="HAL_SELF_IMPROVE_EVERY")
     hal_cycle: int = Field(default=1, validation_alias="HAL_CYCLE")
     log_level: str = Field(default="INFO", validation_alias="LOG_LEVEL")
