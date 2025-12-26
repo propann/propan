@@ -15,7 +15,7 @@ def test_homepage(monkeypatch):
     client = _client(monkeypatch)
     response = client.get("/")
     assert response.status_code == 200
-    assert "HAL Brain" in response.get_data(as_text=True)
+    assert "HAL 9000" in response.get_data(as_text=True)
 
 
 def test_health_endpoint(monkeypatch):
@@ -26,6 +26,8 @@ def test_health_endpoint(monkeypatch):
     assert payload["status"] == "ok"
     assert payload["profit"]["status"] == "disabled"
     assert payload["groq"]["status"] == "disabled"
+    assert "thought" in payload
+    assert payload["audio"]["available"] is False
 
 
 def test_profit_disabled(monkeypatch):

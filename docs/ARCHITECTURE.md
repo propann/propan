@@ -2,7 +2,7 @@
 
 ## Vue d'ensemble
 
-Le service **HAL Brain** expose une UI web unique (onglets) et un ensemble d'endpoints API stables. Une boucle de fond rafraîchit périodiquement les profits, la pensée HAL et la synthèse vocale. Les erreurs (Groq, moteur profit, audio) sont centralisées pour affichage dans l'UI et le diagnostic.
+Le service **HAL Brain** expose une UI web unique (page `/`) et un ensemble d'API stables. Une boucle de fond rafraîchit périodiquement les profits, la pensée HAL et la synthèse vocale. Les erreurs (Groq, moteur profit, audio) sont centralisées pour affichage dans l'UI et dans le diagnostic `propan doctor`.
 
 ## Flux principal
 
@@ -13,14 +13,16 @@ Le service **HAL Brain** expose une UI web unique (onglets) et un ensemble d'end
    - Produit un MP3 via `TTSService`.
 
 2. **UI web** (`propan/web/routes_ui.py`)
-   - Page unique avec onglets (Overview, Profit, Thoughts, Logs, Audio, Settings).
+   - Page unique immersive avec onglets : STATUT, PENSÉES, DONNÉES, AUDIO, RÉGLAGES, JOURNAL.
    - Rafraîchissement périodique par appels API.
+   - Synchronisation texte/voix via segments fournis par l'API.
 
 3. **API** (`propan/web/routes_api.py`)
-   - `/api/health` : état consolidé.
+   - `/api/health` : état consolidé + segments de texte + audio disponible.
    - `/api/profit` : snapshot profit.
-   - `/api/thoughts` + `/api/thoughts/clear`.
-   - `/api/audio` : disponibilité audio.
+   - `/api/thoughts` + `/api/thoughts/clear` : historique.
+   - `/api/audio` : disponibilité audio + statut TTS.
+   - `/speech.mp3` : MP3 (204 si absent, jamais de 404).
 
 ## Modules clés
 
@@ -48,5 +50,6 @@ Le service **HAL Brain** expose une UI web unique (onglets) et un ensemble d'end
 ## Notes d'exécution
 
 - La boucle HAL tourne dans un thread séparé (intervalle `HAL_THOUGHT_INTERVAL`).
-- L'UI ne déclenche pas de requête audio si le MP3 est absent.
+- L'UI ne déclenche pas de requête audio si la voix est coupée.
 - `/speech.mp3` et `/favicon.ico` renvoient 204 si non disponibles pour éviter les 404.
+- Les segments de texte sont calculés côté API pour synchroniser l'affichage avec l'audio.

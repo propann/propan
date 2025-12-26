@@ -35,8 +35,8 @@ class CommentaryService:
         if not self._settings.groq_api_key:
             return CommentaryResult(
                 status="disabled",
-                text="Groq API key missing. HAL reste silencieux.",
-                error="GROQ_API_KEY missing.",
+                text="Clé API Groq manquante. HAL reste silencieux.",
+                error="GROQ_API_KEY manquante.",
             )
 
         prompt = self._build_prompt(profit_data)
@@ -50,7 +50,7 @@ class CommentaryService:
             )
             content = completion.choices[0].message.content.strip()
             if not content:
-                raise RuntimeError("Empty Groq response")
+                raise RuntimeError("Réponse Groq vide.")
             return CommentaryResult(status="ok", text=content)
         except Exception as exc:  # noqa: BLE001
             error_message = self._format_error(exc)
@@ -95,8 +95,8 @@ class CommentaryService:
 
         message = str(exc)
         if status_code == 401 or "401" in message:
-            return "Groq API key rejected (401 Unauthorized)."
-        return f"Groq error: {message}"
+            return "Clé API Groq rejetée (401 Unauthorized)."
+        return f"Erreur Groq : {message}"
 
     def _log_once(self, message: str) -> None:
         now = monotonic()
