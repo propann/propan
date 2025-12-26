@@ -21,17 +21,18 @@ services:
     ports:
       - "3000:3000"
 
-  hal_9000:
+  propan:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: hal_9000
+    container_name: propan
     depends_on:
       - ft_engine
-    volumes:
-      - ./:/app
+    env_file:
+      - .env
     environment:
-      - GROQ_API_KEY=${GROQ_API_KEY}
       - HAL_VOICE=en-US-GuyNeural
     ports:
       - "9000:9000"
+    volumes:
+      - ./:/app

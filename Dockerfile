@@ -1,11 +1,12 @@
-FROM python:3.9-slim
+FROM python:3.11-slim
 
 WORKDIR /app
 
-RUN pip install --no-cache-dir groq requests edge-tts rich flask
+COPY pyproject.toml README.md /app/
+COPY propan /app/propan
 
-COPY hal_brain.py /app/hal_brain.py
+RUN pip install --no-cache-dir .
 
 EXPOSE 9000
 
-CMD ["python", "/app/hal_brain.py"]
+CMD ["python", "-m", "propan", "run", "hal-brain"]
