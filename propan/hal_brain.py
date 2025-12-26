@@ -1,253 +1,67 @@
-"""HAL brain service: voice + profit commentary + lightweight web UI."""
+"""HAL brain service: web UI + background commentary loop."""
 
 from __future__ import annotations
 
-import ast
-import asyncio
-import json
 import logging
-import os
 import threading
 import time
-from pathlib import Path
 
-import edge_tts
-import requests
-from flask import Flask, jsonify, send_from_directory
-from groq import Groq
-
-from .settings import get_settings
+from .web.app import AppState, create_app
 
 logger = logging.getLogger(__name__)
 
-app = Flask(__name__)
-last_thought = "HAL is booting."
-last_profit: dict = {}
 
-
-def _safe_json(data: object) -> str:
-    try:
-        return json.dumps(data, indent=2, ensure_ascii=False)
-    except (TypeError, ValueError):
-        return "{}"
-
-
-@app.route("/")
-def index():
-    thought = last_thought.replace("\n", "<br>")
-    return (
-        "<html><head><title>HAL STATUS</title></head><body>"
-        "<h1>HAL STATUS</h1>"
-        f"<p><strong>Dernière pensée:</strong><br>{thought}</p>"
-        "<p><a href='/speech.mp3'>Écouter la dernière synthèse</a></p>"
-        "</body></html>"
-    )
-
-
-@app.route("/status")
-def status():
-    return jsonify({"last_thought": last_thought, "profit": last_profit})
-
-
-@app.route("/speech.mp3")
-def speech():
-    settings = get_settings()
-    if settings.hal_speech_file.exists():
-        return send_from_directory(settings.hal_speech_file.parent, settings.hal_speech_file.name)
-    return ("speech.mp3 not generated yet", 404)
-
-
-def run_web() -> None:
+def _run_web(app) -> None:
     app.run(host="0.0.0.0", port=9000, debug=False, use_reloader=False)
 
 
-def fetch_profit() -> dict:
-    settings = get_settings()
-    try:
-        response = requests.get(settings.ft_engine_profit_url, timeout=10)
-        response.raise_for_status()
-        return response.json()
-    except requests.RequestException as exc:
-        logger.warning("Profit fetch failed: %s", exc)
-        return {}
-
-
-def classify_profit(profit_data: dict) -> str:
-    if not profit_data:
-        return "unknown"
-    for key in ("profit_total", "profit_abs", "profit_all", "profit"):
-        value = profit_data.get(key)
-        if isinstance(value, (int, float)):
-            return "gain" if value >= 0 else "loss"
-    return "unknown"
-
-
-def groq_comment(profit_data: dict) -> str:
-    settings = get_settings()
-    if not settings.groq_api_key:
-        return "Groq API key missing. HAL reste silencieux."
-
-    mood = classify_profit(profit_data)
-    prompt = (
-        "Tu es HAL 9000, une IA cynique et arrogante. "
-        "Analyse les statistiques suivantes et réponds en 2 phrases en français. "
-        "Si les profits sont négatifs, sois cynique et condescendant. "
-        "Si les profits sont positifs, sois arrogant et supérieur."
-        f"\n\nStats: {_safe_json(profit_data)}\n"
-        f"Mood: {mood}\n"
-        "Réponse:"
-    )
-
-    client = Groq(api_key=settings.groq_api_key)
-    try:
-        completion = client.chat.completions.create(
-            model="llama3-70b-8192",
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.7,
-        )
-        return completion.choices[0].message.content.strip()
-    except Exception as exc:  # noqa: BLE001
-        logger.error("Groq comment failed: %s", exc)
-        return "HAL ne peut pas analyser les données pour l'instant."
-
-
-def generate_speech(text: str) -> None:
-    settings = get_settings()
-
-    async def _run() -> None:
-        communicate = edge_tts.Communicate(text=text, voice=settings.hal_voice)
-        await communicate.save(str(settings.hal_speech_file))
-
-    try:
-        asyncio.run(_run())
-    except RuntimeError:
-        loop = asyncio.new_event_loop()
-        loop.run_until_complete(_run())
-        loop.close()
-
-
-def _extract_routes(tree: ast.AST) -> dict[str, str]:
-    routes: dict[str, str] = {}
-    for node in ast.walk(tree):
-        if not isinstance(node, ast.FunctionDef):
-            continue
-        for decorator in node.decorator_list:
-            if not isinstance(decorator, ast.Call):
-                continue
-            if not isinstance(decorator.func, ast.Attribute):
-                continue
-            if decorator.func.attr != "route":
-                continue
-            if not isinstance(decorator.func.value, ast.Name):
-                continue
-            if decorator.func.value.id != "app":
-                continue
-            if not decorator.args:
-                continue
-            route_arg = decorator.args[0]
-            if isinstance(route_arg, ast.Constant) and isinstance(route_arg.value, str):
-                routes[route_arg.value] = node.name
-    return routes
-
-
-def _validate_self_improvement_code(new_code: str) -> tuple[bool, str]:
-    try:
-        tree = ast.parse(new_code)
-    except SyntaxError as exc:
-        return False, f"syntax invalid: {exc}"
-
-    functions = {node.name for node in ast.walk(tree) if isinstance(node, ast.FunctionDef)}
-    required_functions = {"index", "status", "speech", "main_loop", "main"}
-    missing_functions = required_functions - functions
-    if missing_functions:
-        return False, f"missing functions: {', '.join(sorted(missing_functions))}"
-
-    routes = _extract_routes(tree)
-    required_routes = {"/", "/status", "/speech.mp3"}
-    missing_routes = required_routes - set(routes)
-    if missing_routes:
-        return False, f"missing routes: {', '.join(sorted(missing_routes))}"
-
-    return True, "ok"
-
-
-def attempt_self_improvement(cycle_index: int) -> bool:
-    settings = get_settings()
-    if not settings.hal_self_improve:
-        logger.info("Self-improvement skipped: HAL_SELF_IMPROVE disabled.")
-        return False
-    if not settings.groq_api_key:
-        logger.info("Self-improvement skipped: GROQ_API_KEY missing.")
-        return False
-    if cycle_index % settings.hal_self_improve_every != 0:
-        logger.info("Self-improvement skipped: cycle %s not scheduled.", cycle_index)
-        return False
-
-    current_code = Path(__file__).read_text(encoding="utf-8")
-    prompt = (
-        "Améliore ce script Python en ajoutant une nouvelle fonction d'analyse "
-        "sur les profits, sans supprimer les fonctionnalités existantes. "
-        "Retourne le fichier complet modifié, rien d'autre.\n\n"
-        f"{current_code}"
-    )
-
-    client = Groq(api_key=settings.groq_api_key)
-    try:
-        completion = client.chat.completions.create(
-            model="llama3-70b-8192",
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.5,
-        )
-        new_code = completion.choices[0].message.content
-    except Exception as exc:  # noqa: BLE001
-        logger.error("Self-improvement failed: %s", exc)
-        return False
-
-    if not new_code:
-        logger.warning("Self-improvement rejected: empty output.")
-        return False
-    if "HAL STATUS" not in new_code:
-        logger.warning("Self-improvement rejected: missing HAL STATUS page.")
-        return False
-
-    is_valid, reason = _validate_self_improvement_code(new_code)
-    if not is_valid:
-        logger.warning("Self-improvement rejected: %s", reason)
-        return False
-
-    backup_path = Path(__file__).with_suffix(".py.bak")
-    backup_path.write_text(current_code, encoding="utf-8")
-    logger.info("Backup written: %s", backup_path)
-
-    Path(__file__).write_text(new_code, encoding="utf-8")
-    logger.info("HAL upgraded. Restarting...")
-    os.execv(os.sys.executable, [os.sys.executable, __file__])
-    return True
-
-
-def main_loop() -> None:
-    global last_thought
-    global last_profit
-
-    cycle = 0
+def _brain_loop(state: AppState) -> None:
+    interval = state.settings.hal_thought_interval
     while True:
-        cycle += 1
-        last_profit = fetch_profit()
-        last_thought = groq_comment(last_profit)
-        logger.info("HAL thought: %s", last_thought)
         try:
-            generate_speech(last_thought)
+            profit_result = state.profit_service.fetch()
+            state.touch_profit(
+                profit_result.status, profit_result.data, profit_result.error
+            )
+
+            commentary_result = state.commentary_service.generate(profit_result.data)
+            state.touch_commentary(
+                commentary_result.status,
+                commentary_result.text,
+                commentary_result.error,
+            )
+            state.thought_store.add(
+                commentary_result.text,
+                source="groq" if commentary_result.status == "ok" else "system",
+            )
+
+            if commentary_result.status == "ok":
+                tts_result = state.tts_service.generate(commentary_result.text)
+                state.touch_audio(tts_result.status, tts_result.error)
+            else:
+                state.touch_audio(
+                    status=(
+                        "disabled"
+                        if commentary_result.status == "disabled"
+                        else "skipped"
+                    ),
+                    error=None,
+                )
+
+            logger.info("HAL thought: %s", commentary_result.text)
         except Exception as exc:  # noqa: BLE001
-            logger.error("Speech generation failed: %s", exc)
-        attempt_self_improvement(cycle)
-        time.sleep(30)
+            logger.error("HAL brain loop failed: %s", exc)
+        time.sleep(interval)
 
 
 def main() -> None:
     """Start HAL brain web + loop."""
-    web_thread = threading.Thread(target=run_web, daemon=True)
+    app = create_app()
+    state: AppState = app.extensions["state"]
+
+    web_thread = threading.Thread(target=_run_web, args=(app,), daemon=True)
     web_thread.start()
-    main_loop()
+    _brain_loop(state)
 
 
 if __name__ == "__main__":

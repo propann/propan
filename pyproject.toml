@@ -33,12 +33,13 @@ dev = [
 propan = "propan.cli:app"
 
 [tool.setuptools]
-packages = ["propan"]
+packages = ["propan", "propan.services", "propan.web"]
 
 [tool.pytest.ini_options]
 minversion = "7.0"
 addopts = "-ra"
 testpaths = ["tests"]
+pythonpath = ["."]
 
 [tool.ruff]
 line-length = 100

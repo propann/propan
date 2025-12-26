@@ -184,9 +184,10 @@ class MoteurEvolution:
                 return False
             resultat = fonction()
             logger.info("Résultat du test sandbox: %s", resultat)
-        except (SyntaxError, ValueError, TypeError, RuntimeError, NameError) as exc:
-            console.print("[bold red]Erreur critique lors du test sandbox (voir logs).[/]")
-            logger.error("Erreur critique lors du test sandbox: %s", exc)
+        except Exception:  # noqa: BLE001
+            console.print(
+                "[bold red]Erreur critique lors du test sandbox (voir logs).[/]"
+            )
             traceback.print_exc()
             return False
         return True
