@@ -4,9 +4,10 @@ from __future__ import annotations
 
 import importlib
 import logging
-from typing import Iterable
+from collections.abc import Iterable
 
 import typer
+
 from .logging_utils import configure_logging
 from .settings import get_settings
 

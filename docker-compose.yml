@@ -34,5 +34,3 @@ services:
       - HAL_VOICE=en-US-GuyNeural
     ports:
       - "9000:9000"
-    volumes:
-      - ./:/app
