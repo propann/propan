@@ -26,7 +26,7 @@ class AppState:
     last_profit_status: str = "unknown"
     last_profit_error: str | None = None
     last_profit_at: str | None = None
-    last_commentary: str = "HAL is booting."
+    last_commentary: str = "HAL initialise ses systèmes."
     last_commentary_status: str = "unknown"
     last_commentary_error: str | None = None
     last_commentary_at: str | None = None
@@ -73,13 +73,15 @@ def create_app() -> Flask:
         state.touch_profit(
             status="disabled",
             data={},
-            error="FT_ENGINE_PROFIT_URL is empty; profit fetching disabled.",
+            error=(
+                "FT_ENGINE_PROFIT_URL est vide ; la récupération des profits est désactivée."
+            ),
         )
     if not settings.groq_api_key:
         state.touch_commentary(
             status="disabled",
             text=state.last_commentary,
-            error="GROQ_API_KEY missing.",
+            error="GROQ_API_KEY manquante.",
         )
 
     app.extensions["state"] = state

@@ -38,7 +38,9 @@ class ProfitService:
             return ProfitResult(
                 status="disabled",
                 data={},
-                error="FT_ENGINE_PROFIT_URL is empty; profit fetching disabled.",
+                error=(
+                    "FT_ENGINE_PROFIT_URL est vide ; la récupération des profits est désactivée."
+                ),
             )
 
         try:
@@ -50,12 +52,12 @@ class ProfitService:
             self._log_once(error_message)
             return ProfitResult(status="error", data={}, error=error_message)
         except ValueError as exc:
-            error_message = f"Invalid profit payload: {exc}"
+            error_message = f"Charge utile profit invalide : {exc}"
             self._log_once(error_message)
             return ProfitResult(status="error", data={}, error=error_message)
 
         if not isinstance(payload, dict):
-            error_message = "Profit payload is not a JSON object."
+            error_message = "La charge utile profit n'est pas un objet JSON."
             self._log_once(error_message)
             return ProfitResult(status="error", data={}, error=error_message)
 
@@ -68,12 +70,12 @@ class ProfitService:
 
         if host == "ft_engine":
             return (
-                "FT engine host 'ft_engine' is unreachable from local runs. "
-                "Run with docker compose or set FT_ENGINE_PROFIT_URL to a reachable host. "
-                f"Original error: {message}"
+                "L'hôte FT engine 'ft_engine' est injoignable depuis un lancement local. "
+                "Utilisez docker compose ou définissez FT_ENGINE_PROFIT_URL sur un hôte "
+                f"joignable. Erreur d'origine : {message}"
             )
 
-        return f"Profit fetch failed for {url}: {message}"
+        return f"Échec de récupération profit pour {url} : {message}"
 
     def _log_once(self, message: str) -> None:
         now = monotonic()

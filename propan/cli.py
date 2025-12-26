@@ -86,10 +86,10 @@ def doctor() -> None:
     settings = get_settings()
     issues: list[str] = []
 
-    typer.echo("🩺 Propan doctor report")
+    typer.echo("🩺 Rapport doctor Propan")
 
     if not settings.groq_api_key:
-        issues.append("GROQ_API_KEY manquant (nécessaire pour HAL/Ouroboros).")
+        issues.append("GROQ_API_KEY manquante (nécessaire pour HAL/Ouroboros).")
     else:
         typer.echo("✔ GROQ_API_KEY détectée")
 
@@ -105,7 +105,7 @@ def doctor() -> None:
     ]
     missing = _check_dependencies(required_modules)
     if missing:
-        issues.append(f"Dépendances manquantes: {', '.join(missing)}")
+        issues.append(f"Dépendances manquantes : {', '.join(missing)}")
     else:
         typer.echo("✔ Dépendances Python OK")
 
@@ -115,15 +115,17 @@ def doctor() -> None:
         try:
             client = groq.Groq(api_key=settings.groq_api_key)
             client.models.list()
-            typer.echo("✔ Groq API key validée")
+            typer.echo("✔ Clé Groq validée")
         except Exception as exc:  # noqa: BLE001
             message = str(exc)
             if "401" in message:
-                issues.append("Groq API key rejetée (401 Unauthorized).")
+                issues.append("Clé Groq rejetée (401 Unauthorized).")
             else:
-                issues.append(f"Diagnostic Groq KO: {exc}")
+                issues.append(f"Diagnostic Groq KO : {exc}")
 
-    if settings.ft_engine_profit_url and "requests" not in missing:
+    if not settings.ft_engine_profit_url:
+        typer.echo("ℹ️  Profits désactivés (FT_ENGINE_PROFIT_URL vide)")
+    elif "requests" not in missing:
         import requests
 
         try:
@@ -131,10 +133,15 @@ def doctor() -> None:
             response.raise_for_status()
             typer.echo("✔ Accès réseau OK vers FT engine")
         except Exception as exc:  # noqa: BLE001
-            issues.append(f"Accès réseau KO vers FT engine: {exc}")
+            issues.append(f"Accès réseau KO vers FT engine : {exc}")
+
+    if "edge_tts" in missing:
+        issues.append("Synthèse vocale indisponible (edge_tts manquant).")
+    else:
+        typer.echo(f"✔ Synthèse vocale prête (voix: {settings.hal_voice})")
 
     if issues:
-        typer.echo("\n⚠️  Problèmes détectés:")
+        typer.echo("\n⚠️  Problèmes détectés :")
         for issue in issues:
             typer.echo(f"- {issue}")
         raise typer.Exit(code=1)

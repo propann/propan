@@ -32,7 +32,7 @@ class TTSService:
     def generate(self, text: str) -> TTSResult:
         """Generate speech audio for text."""
         if not text:
-            return TTSResult(status="skipped", error="Empty text")
+            return TTSResult(status="skipped", error="Texte vide")
 
         async def _run() -> None:
             communicate = edge_tts.Communicate(text=text, voice=self._settings.hal_voice)
@@ -46,6 +46,6 @@ class TTSService:
             loop.close()
         except Exception as exc:  # noqa: BLE001
             logger.error("Speech generation failed: %s", exc)
-            return TTSResult(status="error", error=str(exc))
+            return TTSResult(status="error", error=f"Erreur synthèse vocale : {exc}")
 
         return TTSResult(status="ok", path=self._settings.hal_speech_file)
