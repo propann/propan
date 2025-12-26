@@ -13,11 +13,13 @@
 - `Dockerfile`, `docker-compose.yml` : exécution Docker/Compose
 - `docs/ARCHITECTURE.md` : flux et modules
 
-## Installation (local)
+## Quickstart local
 
 ```bash
 python -m venv .venv
 source .venv/bin/activate
+pip install -e .
+# Optionnel pour contribuer
 pip install -e ".[dev]"
 ```
 
@@ -44,17 +46,33 @@ docker compose up --build
 
 Le service `propan` expose l'UI HAL Brain sur `http://localhost:9000`.
 
+### Développement (avec volume mount)
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
+```
+
 ## CLI
 
-Commandes principales :
+Commandes principales (exemples) :
 
-- `propan run ouroboros`
-- `propan run hal`
-- `propan run hal-brain`
-- `propan dashboard`
-- `propan doctor`
+- `propan run ouroboros` : lance le cycle Ouroboros
+- `propan run hal` : lance HAL (TUI)
+- `propan run hal-brain` : lance HAL brain (web + voix)
+- `propan dashboard` : dashboard HAL brain
+- `propan doctor` : diagnostics de l'installation
 
-## Variables d'environnement
+## Configuration (.env)
+
+Créez un fichier `.env` à la racine (un exemple est fourni dans `.env.example`).
+
+Exemple minimal :
+
+```bash
+GROQ_API_KEY=sk-...
+HAL_SELF_IMPROVE=false
+LOG_LEVEL=INFO
+```
 
 | Variable | Description | Défaut |
 | --- | --- | --- |
@@ -95,6 +113,8 @@ Endpoints principaux :
 - **Groq 401** : vérifiez la clé API et relancez `propan doctor`.
 - **HAL brain ne voit pas Freqtrade** : vérifiez `FT_ENGINE_PROFIT_URL` et le réseau Docker/local.
 - **TUI muette** : lancez `propan doctor` pour un diagnostic rapide.
+- **Auto-amélioration désactivée** : activez `HAL_SELF_IMPROVE=true` si vous souhaitez autoriser HAL à modifier son code.
+- **Voix absente** : vérifiez que `edge-tts` est bien installé et que `HAL_VOICE` correspond à une voix disponible.
 
 ## Tests
 

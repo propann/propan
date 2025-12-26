@@ -96,9 +96,7 @@ class MoteurEvolution:
             sandbox_globals = globals().copy()
             local_scope: dict[str, object] = {}
             exec(code, sandbox_globals, local_scope)
-            fonction = local_scope.get("noyau_vital") or sandbox_globals.get(
-                "noyau_vital"
-            )
+            fonction = local_scope.get("noyau_vital") or sandbox_globals.get("noyau_vital")
             if not callable(fonction):
                 logger.error("La fonction noyau_vital est absente ou invalide.")
                 return False

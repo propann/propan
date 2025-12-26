@@ -178,13 +178,9 @@ class MoteurEvolution:
             sandbox_globals = globals().copy()
             local_scope: dict[str, object] = {}
             exec(code, sandbox_globals, local_scope)
-            fonction = local_scope.get("mission_hal") or sandbox_globals.get(
-                "mission_hal"
-            )
+            fonction = local_scope.get("mission_hal") or sandbox_globals.get("mission_hal")
             if not callable(fonction):
-                console.print(
-                    "[bold red]La fonction mission_hal est absente ou invalide.[/]"
-                )
+                console.print("[bold red]La fonction mission_hal est absente ou invalide.[/]")
                 return False
             resultat = fonction()
             logger.info("Résultat du test sandbox: %s", resultat)
@@ -249,23 +245,17 @@ class MoteurEvolution:
         user_input = console.input(
             "[bold red]Dave, une instruction pour ma prochaine mutation ? > [/]"
         )
-        nouveau_mission = self._appeler_modele(
-            mission, user_input, competences_actuelles
-        )
+        nouveau_mission = self._appeler_modele(mission, user_input, competences_actuelles)
         self._valider_fonction(nouveau_mission)
         if self._tester_sandbox(nouveau_mission):
             nouveau_source = self._remplacer_mission(source, nouveau_mission)
         else:
-            console.print(
-                "[bold red]MUTATION REJETÉE : Erreur détectée en sandbox.[/]"
-            )
+            console.print("[bold red]MUTATION REJETÉE : Erreur détectée en sandbox.[/]")
             return False
         if verifier_syntaxe(nouveau_source):
             donnees_memoire["generation"] = cycle
             donnees_memoire["historique_ordres"].append(user_input)
-            nouvelles_competences = self._detecter_nouvelles_competences(
-                nouveau_mission
-            )
+            nouvelles_competences = self._detecter_nouvelles_competences(nouveau_mission)
             for competence in nouvelles_competences:
                 memoire.ajouter_competence(competence)
             memoire.sauvegarder()
